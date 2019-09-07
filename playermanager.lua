@@ -273,14 +273,16 @@ local cmd_lookup_table = {
    }
 }
 
-function table_keys(tab)
+function table_keyvals(tab)
    local keyset = {}
+   local valset = {}
    local n = 0
    for k, v in pairs(tab) do
       n = n + 1
       keyset[n] = k
+      valset[n] = v
    end
-   return keyset
+   return keyset, valset
 end
 
 local function pm_parse_params(pname, raw_params)
@@ -290,7 +292,7 @@ local function pm_parse_params(pname, raw_params)
    end
 
    if #params == 0 then
-      local actions = table_keys(cmd_lookup_table)
+      local actions = table_keyvals(cmd_lookup_table)
       return true, "Usage: /group <action> ...\n" ..
          "Valid actions: " .. table.concat(actions, ", ")
    end
