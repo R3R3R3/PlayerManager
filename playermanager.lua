@@ -151,100 +151,152 @@ end
 
 --[[ End of DB interface ]]--
 
-local function pm_parse_params(pname, params)
-   local accum = {}
-   for chunk in string.gmatch(params, "[^%s]+") do
-      table.insert(accum, chunk)
+local function group_create_cmd(sender, group_name)
+   if string.len(group_name) > 16 then
+      return false, "Group name '"..group_name..
+         "' is too long (16 character limit)."
    end
+   pm.register_group(group_name)
+   local ctgroup = pm.get_group_by_name(group_name)
+   pm.register_player_group_permission(sender.id, ctgroup.id, "admin")
+   return true, "Group '"..group_name.."' created successfully."
+end
 
-   if #accum < 2 then
-      return false, "Malformed command."
-   end
-
-   local action = accum[1]
-   local group_name = accum[2]
-
-   local player_id = pm.get_player_by_name(pname).id
-
-   if action == "create" then
-      if string.len(group_name) > 16 then
-         return false, "Group name '"..group_name..
-            "' is too long (16 character limit)."
-      end
-      pm.register_group(group_name)
-      local ctgroup_id = pm.get_group_by_name(group_name).id
-      pm.register_player_group_permission(player_id, ctgroup_id, "admin")
-      return true, "Group '"..group_name.."' created successfully."
-   end
-
+local function group_info_cmd(sender, group_name)
    local ctgroup = pm.get_group_by_name(group_name)
    if not ctgroup then
       return false, "Group '"..group_name.."' not found."
    end
-   local ctgroup_id = ctgroup.id
 
-   local player_group_info = pm.get_player_group(player_id, ctgroup_id)
-   if not player_group_info then
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
       return false, "You are not on group '"..group_name.."'."
    end
-   local permission = player_group_info.permission
 
-   if action == "info" then
-      return true,
-      "[Group: "..group_name.."]\n" ..
-         "Your permission level: "..permission.."\n" ..
-         "\n" ..
-         "Admins: "..tostring(nil).."\n" ..
-         "Mods: "..tostring(nil).."\n" ..
-         "Members: "..tostring(nil).."\n"
+   local permission = sender_group_info.permission
+   return true,
+   "[Group: "..ctgroup.name.."]\n" ..
+      "Your permission level: "..permission.."\n" ..
+      "\n" ..
+      "Admins: "..tostring(nil).."\n" ..
+      "Mods: "..tostring(nil).."\n" ..
+      "Members: "..tostring(nil).."\n"
+end
+
+local function group_add_cmd(sender, group_name, target)
+   local ctgroup = pm.get_group_by_name(group_name)
+   if not ctgroup then
+      return false, "Group '"..group_name.."' not found."
+   end
+
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
+      return false, "You are not on group '"..group_name.."'."
+   end
+
+   if sender_group_info.permission ~= "admin" then
+      return false, "You don't have permission to do that."
+   end
+
+   local target_player = pm.get_player_by_name(target)
+   if not target_player then
+      return false, "Player '"..target.."' not found."
+   end
+
+   local target_player_group_info
+      = pm.get_player_group(target_player.id, ctgroup.id)
+   if target_player_group_info then
+      return false, "Player '"..target_player.name ..
+         "' is already in group '"..ctgroup.name.."'."
+   end
+
+   pm.register_player_group_permission(target_player.id, ctgroup.id, "member")
+   return true, "Player '"..target_player.name.."' added to group '" ..
+      ctgroup.name.."'."
+end
+
+local function group_rank_cmd(sender, group_name, target, new_target_rank)
+   local ctgroup = pm.get_group_by_name(group_name)
+   if not ctgroup then
+      return false, "Group '"..group_name.."' not found."
+   end
+
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
+      return false, "You are not on group '"..group_name.."'."
+   end
+
+   if sender_group_info.permission ~= "admin" then
+      return false, "You don't have permission to do that."
+   end
+
+   local target_player = pm.get_player_by_name(target)
+   if not target_player then
+      return false, "Player '"..target.."' not found."
+   end
+
+   local target_player_group_info
+      = pm.get_player_group(target_player.id, ctgroup.id)
+   if not target_player_group_info then
+      return false, "Player '"..target_player.name ..
+         "' is not in group '"..ctgroup.name.."'."
+   end
+   if new_target_rank ~= "member" and
+      new_target_rank ~= "mod" and
+      new_target_rank ~= "admin"
+   then
+      return false, "Invalid permission '"..new_target_rank ..
+         "', must be one of: member, mod, admin."
+   end
+
+   pm.update_player_group(target_player.id, ctgroup.id, new_target_rank)
+   return true, "Promoted player '"..target_player.name.."' to '" ..
+      new_target_rank.."' of group '"..ctgroup.name.."'."
+end
+
+
+local function pm_parse_params(pname, raw_params)
+   local params = {}
+   for chunk in string.gmatch(raw_params, "[^%s]+") do
+      table.insert(params, chunk)
+   end
+
+   if #params == 0 then
+      return true, "Usage: /group <info, create, add, rank> ..."
+   end
+
+   local action = params[1]
+
+   local sender = pm.get_player_by_name(pname)
+
+   if action == "create" then
+      if #params ~= 2 then
+         return false, "Invalid arguments, usage: /group create <group>"
+      end
+      local group_name = params[2]
+      return group_create_cmd(sender, group_name)
+   elseif action == "info" then
+      if #params ~= 2 then
+         return false, "Invalid arguments, usage: /group info <group>"
+      end
+      local group_name = params[2]
+      return group_info_cmd(sender, group_name)
    elseif action == "add" then
-      if permission ~= "admin" then
-         return false, "You don't have permission to do that."
+      if #params ~= 3 then
+         return false, "Invalid arguments, usage: /group add <group> <player>"
       end
-
-      local target = accum[3]
-      local target_player = pm.get_player_by_name(target)
-      if not target_player then
-         return false, "Player '"..target.."' not found."
-      end
-
-      local target_player_group_info
-         = pm.get_player_group(target_player.id, ctgroup_id)
-      if target_player_group_info then
-         return false, "Player '"..target_player.name ..
-            "' is already in group '"..group_name.."'."
-      end
-
-      pm.register_player_group_permission(target_player.id, ctgroup_id, "member")
-      return true, "Player '"..target_player.name.."' added to group '" ..
-         group_name.."'."
+      local group_name = params[2]
+      local target = params[3]
+      return group_add_cmd(sender, group_name, target)
    elseif action == "rank" then
-      if permission ~= "admin" then
-         return false, "You don't have permission to do that."
+      if #params ~= 4 then
+         return false,
+         "Invalid arguments, usage: /group rank <group> <player> <rank>"
       end
-      local target = accum[3]
-      local target_rank = accum[4]
-      local target_player = pm.get_player_by_name(target)
-      if not target_player then
-         return false, "Player '"..target.."' not found."
-      end
-      local target_player_group_info
-         = pm.get_player_group(target_player.id, ctgroup_id)
-      if not target_player_group_info then
-         return false, "Player '"..target_player.name ..
-            "' is not in group '"..group_name.."'."
-      end
-      if target_rank ~= "member" and
-         target_rank ~= "mod" and
-         target_rank ~= "admin"
-      then
-         return false, "Invalid permission '"..target_rank ..
-            "', must be one of: member, mod, admin."
-      end
-
-      pm.update_player_group(target_player.id, ctgroup_id, target_rank)
-      return true, "Promoted player '"..target_player.name.."' to '" ..
-         target_rank.."' of group '"..group_name.."'."
+      local group_name = params[2]
+      local target = params[3]
+      local target_new_rank = params[4]
+      return group_rank_cmd(sender, group_name, target, target_new_rank)
    end
 
    return false, "Unknown action: '"..action.."'."
@@ -255,8 +307,8 @@ minetest.register_chatcommand("group", {
    params = "<action> <group name> [<params...>]",
    description = "PlayerManager group management.",
    func = function(pname, params)
-      local player = minetest.get_player_by_name(pname)
-      if not player then
+      local sender = minetest.get_player_by_name(pname)
+      if not sender then
          return false
       end
       local success, message = pm_parse_params(pname, params)
