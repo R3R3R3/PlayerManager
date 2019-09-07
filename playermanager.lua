@@ -254,6 +254,34 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
       new_target_rank.."' of group '"..ctgroup.name.."'."
 end
 
+local cmd_lookup_table = {
+   create = {
+      params = { "<group>" },
+      fn = group_create_cmd
+   },
+   info = {
+      params = { "<group>" },
+      fn = group_info_cmd
+   },
+   add = {
+      params = { "<group>", "<player>" },
+      fn = group_add_cmd
+   },
+   rank = {
+      params = { "<group>", "<player>", "<new_rank>" },
+      fn = group_rank_cmd
+   }
+}
+
+function table_keys(tab)
+   local keyset = {}
+   local n = 0
+   for k, v in pairs(tab) do
+      n = n + 1
+      keyset[n] = k
+   end
+   return keyset
+end
 
 local function pm_parse_params(pname, raw_params)
    local params = {}
@@ -262,41 +290,23 @@ local function pm_parse_params(pname, raw_params)
    end
 
    if #params == 0 then
-      return true, "Usage: /group <info, create, add, rank> ..."
+      local actions = table_keys(cmd_lookup_table)
+      return true, "Usage: /group <action> ...\n" ..
+         "Valid actions: " .. table.concat(actions, ", ")
    end
 
-   local action = params[1]
-
+   -- Pop the action from the parameters
+   local action = table.remove(params, 1)
    local sender = pm.get_player_by_name(pname)
 
-   if action == "create" then
-      if #params ~= 2 then
-         return false, "Invalid arguments, usage: /group create <group>"
+   local cmd_spec = cmd_lookup_table[action]
+   if cmd_spec then
+      if #params ~= #cmd_spec.params then
+         return false, "Invalid arguments, usage: /group " .. action .. " "
+            .. table.concat(cmd_spec.params, " ")
       end
-      local group_name = params[2]
-      return group_create_cmd(sender, group_name)
-   elseif action == "info" then
-      if #params ~= 2 then
-         return false, "Invalid arguments, usage: /group info <group>"
-      end
-      local group_name = params[2]
-      return group_info_cmd(sender, group_name)
-   elseif action == "add" then
-      if #params ~= 3 then
-         return false, "Invalid arguments, usage: /group add <group> <player>"
-      end
-      local group_name = params[2]
-      local target = params[3]
-      return group_add_cmd(sender, group_name, target)
-   elseif action == "rank" then
-      if #params ~= 4 then
-         return false,
-         "Invalid arguments, usage: /group rank <group> <player> <rank>"
-      end
-      local group_name = params[2]
-      local target = params[3]
-      local target_new_rank = params[4]
-      return group_rank_cmd(sender, group_name, target, target_new_rank)
+      -- all cmd handler functions take the sender, and the parameters
+      return cmd_spec.fn(sender, unpack(params))
    end
 
    return false, "Unknown action: '"..action.."'."
