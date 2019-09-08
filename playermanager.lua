@@ -112,12 +112,22 @@ function pm.get_group_by_id(ctgroup_id)
 end
 
 local QUERY_DELETE_GROUP = [[
-  DELETE FROM ctgroup WHERE ctgroup.id = ?
+  DELETE FROM ctgroup
+  WHERE ctgroup.id = ?
 ]]
 
 function pm.delete_group(ctgroup_id)
-   return assert(u.prepare(db, QUERY_REGISTER_PLAYER_GROUP_PERMISSION,
-                           ctgroup_id))
+   return assert(u.prepare(db, QUERY_DELETE_GROUP, ctgroup_id))
+end
+
+local QUERY_RENAME_GROUP = [[
+  UPDATE ctgroup SET name = ?
+  WHERE ctgroup.id = ?
+]]
+
+function pm.rename_group(ctgroup_id, new_group_name)
+   return assert(u.prepare(db, QUERY_RENAME_GROUP,
+                           new_group_name, ctgroup_id))
 end
 
 --[[ PLAYER <--> GROUPS MAPPING ]]--
@@ -196,6 +206,15 @@ function pm.get_players_for_group(ctgroup_id)
       row = cur:fetch(row, "a")
    end
    return players
+end
+
+local QUERY_DELETE_PLAYERS_FOR_GROUP = [[
+  DELETE FROM player_ctgroup
+  WHERE player_ctgroup.ctgroup_id = ?
+]]
+
+function pm.delete_players_for_group(ctgroup_id)
+   return assert(u.prepare(db, QUERY_DELETE_PLAYERS_FOR_GROUP, ctgroup_id))
 end
 
 --[[ End of DB interface ]]--
@@ -409,14 +428,83 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
    return true
 end
 
+local function group_delete_cmd(sender, group_name, confirm)
+   local ctgroup = pm.get_group_by_name(group_name)
+   if not ctgroup then
+      return false, "Group '"..group_name.."' not found."
+   end
+
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
+      return false, "You are not on group '"..group_name.."'."
+   end
+
+   if sender_group_info.permission ~= "admin" then
+      return false, "You don't have permission to do that."
+   end
+
+   if not confirm or
+      confirm ~= "confirm"
+   then
+      return false, "You must confirm this action!"
+   end
+
+   pm.delete_players_for_group(ctgroup.id)
+   pm.delete_group(ctgroup.id)
+
+   minetest.chat_send_player(
+      sender.name,
+      "Deleted group '"..ctgroup.name.."'."
+   )
+   return true
+end
+
+local function group_rename_cmd(sender, group_name, new_group_name)
+   local ctgroup = pm.get_group_by_name(group_name)
+   if not ctgroup then
+      return false, "Group '"..group_name.."' not found."
+   end
+
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
+      return false, "You are not on group '"..group_name.."'."
+   end
+
+   if sender_group_info.permission ~= "admin" then
+      return false, "You don't have permission to do that."
+   end
+
+   if string.len(new_group_name) > 16 then
+      return false, "Proposed name '"..new_group_name..
+         "' is too long (16 character limit)."
+   end
+
+   pm.rename_group(ctgroup.id, new_group_name)
+
+   minetest.chat_send_player(
+      sender.name,
+      "Renamed group '"..ctgroup.name.."' to '"..new_group_name.. "'."
+   )
+   return true
+end
+
 local cmd_lookup_table = {
    create = {
       params = { "<group>" },
       fn = group_create_cmd
    },
+   delete = {
+      params = { "<group>", "<confirm>" },
+      fn = group_delete_cmd,
+      accept_many_after = 1
+   },
    info = {
       params = { "<group>" },
       fn = group_info_cmd
+   },
+   rename = {
+      params = { "<group>", "<new_name>" },
+      fn = group_rename_cmd
    },
    add = {
       params = { "<group>", "<players...>" },
