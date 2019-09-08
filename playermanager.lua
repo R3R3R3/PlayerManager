@@ -316,6 +316,55 @@ local function group_add_cmd(sender, group_name, ...)
    return true
 end
 
+local function group_remove_cmd(sender, group_name, ...)
+   local ctgroup = pm.get_group_by_name(group_name)
+   if not ctgroup then
+      return false, "Group '"..group_name.."' not found."
+   end
+
+   local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
+   if not sender_group_info then
+      return false, "You are not on group '"..group_name.."'."
+   end
+
+   if sender_group_info.permission ~= "admin" then
+      return false, "You don't have permission to do that."
+   end
+
+   local targets = { ... }
+   for _, target in ipairs(targets) do
+      local target_player = pm.get_player_by_name(target)
+      if not target_player then
+         minetest.chat_send_player(
+            sender.name,
+            "Player '"..target.."' not found."
+         )
+         goto continue
+      end
+
+      local target_player_group_info
+         = pm.get_player_group(target_player.id, ctgroup.id)
+      if not target_player_group_info then
+         minetest.chat_send_player(
+            sender.name,
+            "Player '"..target_player.name ..
+               "' is not in group '"..ctgroup.name.."'."
+         )
+         goto continue
+      end
+
+      pm.delete_player_group(target_player.id, ctgroup.id)
+
+      minetest.chat_send_player(
+         sender.name,
+         "Player '"..target_player.name.."' removed from group '" ..
+            ctgroup.name .. "'."
+      )
+      ::continue::
+   end
+   return true
+end
+
 local function group_rank_cmd(sender, group_name, target, new_target_rank)
    local ctgroup = pm.get_group_by_name(group_name)
    if not ctgroup then
@@ -372,6 +421,11 @@ local cmd_lookup_table = {
    add = {
       params = { "<group>", "<players...>" },
       fn = group_add_cmd,
+      accept_many_after = 2
+   },
+   remove = {
+      params = { "<group>", "<players...>"},
+      fn = group_remove_cmd,
       accept_many_after = 2
    },
    rank = {
