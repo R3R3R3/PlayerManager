@@ -8,12 +8,14 @@ Handles new player registry and player groups.
 
 local db = ...
 
---[[
-Random id generator, adapted from
-https://gist.github.com/haggen/2fd643ea9a261fea2094#gistcomment-2339900
+local u = pmutils
 
-Generate random hex strings as player uuids
-]]--
+--[[
+Random id generator, adapted from -- --
+https://gist.github.com/haggen/2fd643ea9a261fea2094#gistcomment-2339900 -- --
+--                              --
+Generate random hex strings as player uuids -- --
+]]                              --
 local charset = {}  do -- [0-9a-f]
     for c = 48, 57  do table.insert(charset, string.char(c)) end
     for c = 97, 102 do table.insert(charset, string.char(c)) end
@@ -39,7 +41,7 @@ local QUERY_REGISTER_PLAYER = [[
 
 function pm.register_player(player_name)
    local player_id = generate_id()
-   return assert(prepare(db, QUERY_REGISTER_PLAYER, player_id, player_name))
+   return assert(u.prepare(db, QUERY_REGISTER_PLAYER, player_id, player_name))
 end
 
 local QUERY_GET_PLAYER_BY_NAME = [[
@@ -47,7 +49,7 @@ local QUERY_GET_PLAYER_BY_NAME = [[
 ]]
 
 function pm.get_player_by_name(player_name)
-   local cur = prepare(db, QUERY_GET_PLAYER_BY_NAME, player_name)
+   local cur = u.prepare(db, QUERY_GET_PLAYER_BY_NAME, player_name)
    if cur then
       return cur:fetch({}, "a")
    else
@@ -60,7 +62,7 @@ local QUERY_GET_PLAYER_BY_ID = [[
 ]]
 
 function pm.get_player_by_id(player_id)
-   local cur = prepare(db, QUERY_GET_PLAYER_BY_ID, player_id)
+   local cur = u.prepare(db, QUERY_GET_PLAYER_BY_ID, player_id)
    if cur then
       return cur:fetch({}, "a")
    else
@@ -80,7 +82,7 @@ local QUERY_REGISTER_GROUP = [[
 
 function pm.register_group(ctgroup_name)
    local ctgroup_id = generate_id()
-   return assert(prepare(db, QUERY_REGISTER_GROUP, ctgroup_id, ctgroup_name))
+   return assert(u.prepare(db, QUERY_REGISTER_GROUP, ctgroup_id, ctgroup_name))
 end
 
 local QUERY_GET_GROUP_BY_NAME = [[
@@ -88,7 +90,7 @@ local QUERY_GET_GROUP_BY_NAME = [[
 ]]
 
 function pm.get_group_by_name(ctgroup_name)
-   local cur = prepare(db, QUERY_GET_GROUP_BY_NAME, ctgroup_name)
+   local cur = u.prepare(db, QUERY_GET_GROUP_BY_NAME, ctgroup_name)
    if cur then
       return cur:fetch({}, "a")
    else
@@ -101,7 +103,7 @@ local QUERY_GET_GROUP_BY_ID = [[
 ]]
 
 function pm.get_group_by_id(ctgroup_id)
-   local cur = prepare(db, QUERY_GET_GROUP_BY_ID, ctgroup_id)
+   local cur = u.prepare(db, QUERY_GET_GROUP_BY_ID, ctgroup_id)
    if cur then
       return cur:fetch({}, "a")
    else
@@ -118,7 +120,7 @@ local QUERY_REGISTER_PLAYER_GROUP_PERMISSION = [[
 ]]
 
 function pm.register_player_group_permission(player_id, ctgroup_id, permission)
-   return assert(prepare(db, QUERY_REGISTER_PLAYER_GROUP_PERMISSION,
+   return assert(u.prepare(db, QUERY_REGISTER_PLAYER_GROUP_PERMISSION,
                          player_id, ctgroup_id, permission))
 end
 
@@ -129,7 +131,7 @@ local QUERY_GET_PLAYER_GROUP_PERMISSION = [[
 ]]
 
 function pm.get_player_group(player_id, ctgroup_id)
-   local cur = prepare(db, QUERY_GET_PLAYER_GROUP_PERMISSION,
+   local cur = u.prepare(db, QUERY_GET_PLAYER_GROUP_PERMISSION,
                        player_id, ctgroup_id)
    if cur then
       return cur:fetch({}, "a")
@@ -145,7 +147,7 @@ local QUERY_UPDATE_PLAYER_GROUP_PERMISSION = [[
 ]]
 
 function pm.update_player_group(player_id, ctgroup_id, permission)
-   return assert(prepare(db, QUERY_UPDATE_PLAYER_GROUP_PERMISSION,
+   return assert(u.prepare(db, QUERY_UPDATE_PLAYER_GROUP_PERMISSION,
                          permission, player_id, ctgroup_id))
 end
 
@@ -273,18 +275,6 @@ local cmd_lookup_table = {
    }
 }
 
-function table_keyvals(tab)
-   local keyset = {}
-   local valset = {}
-   local n = 0
-   for k, v in pairs(tab) do
-      n = n + 1
-      keyset[n] = k
-      valset[n] = v
-   end
-   return keyset, valset
-end
-
 local function pm_parse_params(pname, raw_params)
    local params = {}
    for chunk in string.gmatch(raw_params, "[^%s]+") do
@@ -292,7 +282,7 @@ local function pm_parse_params(pname, raw_params)
    end
 
    if #params == 0 then
-      local actions = table_keyvals(cmd_lookup_table)
+      local actions = u.table_keyvals(cmd_lookup_table)
       return true, "Usage: /group <action> ...\n" ..
          "Valid actions: " .. table.concat(actions, ", ")
    end
