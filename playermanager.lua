@@ -267,7 +267,7 @@ local function group_info_cmd(sender, group_name)
    return true
 end
 
-local function group_add_cmd(sender, group_name, target)
+local function group_add_cmd(sender, group_name, ...)
    local ctgroup = pm.get_group_by_name(group_name)
    if not ctgroup then
       return false, "Group '"..group_name.."' not found."
@@ -282,24 +282,37 @@ local function group_add_cmd(sender, group_name, target)
       return false, "You don't have permission to do that."
    end
 
-   local target_player = pm.get_player_by_name(target)
-   if not target_player then
-      return false, "Player '"..target.."' not found."
+   local targets = { ... }
+   for _, target in ipairs(targets) do
+      local target_player = pm.get_player_by_name(target)
+      if not target_player then
+         minetest.chat_send_player(
+            sender.name,
+            "Player '"..target.."' not found."
+         )
+         goto continue
+      end
+
+      local target_player_group_info
+         = pm.get_player_group(target_player.id, ctgroup.id)
+      if target_player_group_info then
+         minetest.chat_send_player(
+            sender.name,
+            "Player '"..target_player.name ..
+               "' is already in group '"..ctgroup.name.."'."
+         )
+         goto continue
+      end
+
+      pm.register_player_group_permission(target_player.id, ctgroup.id, "member")
+
+      minetest.chat_send_player(
+         sender.name,
+         "Player '"..target_player.name.."' added to group '" ..
+            ctgroup.name .. "'."
+      )
+      ::continue::
    end
-
-   local target_player_group_info
-      = pm.get_player_group(target_player.id, ctgroup.id)
-   if target_player_group_info then
-      return false, "Player '"..target_player.name ..
-         "' is already in group '"..ctgroup.name.."'."
-   end
-
-   pm.register_player_group_permission(target_player.id, ctgroup.id, "member")
-
-   minetest.chat_send_player(
-      sender.name,
-      "Player '"..target_player.name.."' added to group '" .. ctgroup.name.."'."
-   )
    return true
 end
 
@@ -357,8 +370,9 @@ local cmd_lookup_table = {
       fn = group_info_cmd
    },
    add = {
-      params = { "<group>", "<player>" },
-      fn = group_add_cmd
+      params = { "<group>", "<players...>" },
+      fn = group_add_cmd,
+      accept_many_after = 2
    },
    rank = {
       params = { "<group>", "<player>", "<new_rank>" },
@@ -384,7 +398,8 @@ local function pm_parse_params(pname, raw_params)
 
    local cmd_spec = cmd_lookup_table[action]
    if cmd_spec then
-      if #params ~= #cmd_spec.params then
+      local param_check_limit = cmd_spec.accept_many_after or #cmd_spec.params
+      if #params < param_check_limit then
          return false, "Invalid arguments, usage: /group " .. action .. " "
             .. table.concat(cmd_spec.params, " ")
       end
