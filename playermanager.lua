@@ -111,7 +111,16 @@ function pm.get_group_by_id(ctgroup_id)
    end
 end
 
---[[ PLAYER <--> GROUPS ]]--
+local QUERY_DELETE_GROUP = [[
+  DELETE FROM ctgroup WHERE ctgroup.id = ?
+]]
+
+function pm.delete_group(ctgroup_id)
+   return assert(u.prepare(db, QUERY_REGISTER_PLAYER_GROUP_PERMISSION,
+                           ctgroup_id))
+end
+
+--[[ PLAYER <--> GROUPS MAPPING ]]--
 
 local QUERY_REGISTER_PLAYER_GROUP_PERMISSION = [[
   INSERT INTO player_ctgroup (player_id, ctgroup_id, permission)
@@ -151,7 +160,47 @@ function pm.update_player_group(player_id, ctgroup_id, permission)
                          permission, player_id, ctgroup_id))
 end
 
+local QUERY_DELETE_PLAYER_GROUP = [[
+  DELETE FROM player_ctgroup
+  WHERE player_ctgroup.player_id = ?
+    AND player_ctgroup.ctgroup_id = ?
+]]
+
+function pm.delete_player_group(player_id, ctgroup_id)
+   return assert(u.prepare(db, QUERY_DELETE_PLAYER_GROUP,
+                           player_id, ctgroup_id))
+end
+
+local QUERY_GET_PLAYERS_FOR_GROUP = [[
+  SELECT player.id, player.name, player_ctgroup.permission
+  FROM player
+  INNER JOIN player_ctgroup
+      ON player.id = player_ctgroup.player_id
+     AND player_ctgroup.ctgroup_id = ?
+]]
+
+function pm.get_players_for_group(ctgroup_id)
+   local cur = u.prepare(db, QUERY_GET_PLAYERS_FOR_GROUP, ctgroup_id)
+   local players = {}
+   local row = cur:fetch({}, "a")
+   while row do
+      -- TODO: clean up, table shallow copy helper func?
+      table.insert(
+         players,
+         {
+            name = row.name,
+            id = row.id,
+            permission = row.permission
+         }
+      )
+      row = cur:fetch(row, "a")
+   end
+   return players
+end
+
 --[[ End of DB interface ]]--
+
+--[[ Command processing (eventually move framework to PMUtils) ]]--
 
 local function group_create_cmd(sender, group_name)
    if string.len(group_name) > 16 then
@@ -161,7 +210,18 @@ local function group_create_cmd(sender, group_name)
    pm.register_group(group_name)
    local ctgroup = pm.get_group_by_name(group_name)
    pm.register_player_group_permission(sender.id, ctgroup.id, "admin")
-   return true, "Group '"..group_name.."' created successfully."
+
+   minetest.chat_send_player(
+      sender.name,
+      "Group '"..group_name.."' created successfully."
+   )
+   return true
+end
+
+local function titlecase_word(perm)
+   local head = perm:sub(1, 1)
+   local tail = perm:sub(2, perm:len())
+   return head:upper() .. tail:lower()
 end
 
 local function group_info_cmd(sender, group_name)
@@ -176,13 +236,35 @@ local function group_info_cmd(sender, group_name)
    end
 
    local permission = sender_group_info.permission
-   return true,
-   "[Group: "..ctgroup.name.."]\n" ..
-      "Your permission level: "..permission.."\n" ..
-      "\n" ..
-      "Admins: "..tostring(nil).."\n" ..
-      "Mods: "..tostring(nil).."\n" ..
-      "Members: "..tostring(nil).."\n"
+   local group_players_info = pm.get_players_for_group(ctgroup.id)
+
+   local c = minetest.colorize
+
+   minetest.chat_send_player(
+      sender.name,
+      c("#0a0", "[Group: ")..c("#fff", ctgroup.name)..c("#0a0", "]") .. "\n" ..
+         c("#0a0", "[Id: ")..c("#fff", ctgroup.id)..c("#0a0", "]") .. "\n" ..
+         "  Your permission level: "..permission
+   )
+
+   local info_table = {}
+   for _, player_info in pairs(group_players_info) do
+      local info_tab_entry = info_table[player_info.permission]
+      if info_tab_entry then
+         table.insert(info_table[player_info.permission], player_info.name)
+      else
+         info_table[player_info.permission] = { player_info.name }
+      end
+   end
+
+   for perm, names in pairs(info_table) do
+      minetest.chat_send_player(
+         sender.name,
+         "  " .. titlecase_word(perm) .. "s: " .. table.concat(names, ", ")
+      )
+   end
+
+   return true
 end
 
 local function group_add_cmd(sender, group_name, target)
@@ -213,8 +295,12 @@ local function group_add_cmd(sender, group_name, target)
    end
 
    pm.register_player_group_permission(target_player.id, ctgroup.id, "member")
-   return true, "Player '"..target_player.name.."' added to group '" ..
-      ctgroup.name.."'."
+
+   minetest.chat_send_player(
+      sender.name,
+      "Player '"..target_player.name.."' added to group '" .. ctgroup.name.."'."
+   )
+   return true
 end
 
 local function group_rank_cmd(sender, group_name, target, new_target_rank)
@@ -252,8 +338,13 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
    end
 
    pm.update_player_group(target_player.id, ctgroup.id, new_target_rank)
-   return true, "Promoted player '"..target_player.name.."' to '" ..
-      new_target_rank.."' of group '"..ctgroup.name.."'."
+
+   minetest.chat_send_player(
+      sender.name,
+      "Promoted player '"..target_player.name.."' to '" .. new_target_rank ..
+         "' of group '"..ctgroup.name.."'."
+   )
+   return true
 end
 
 local cmd_lookup_table = {
@@ -313,9 +404,12 @@ minetest.register_chatcommand("group", {
       if not sender then
          return false
       end
-      local success, message = pm_parse_params(pname, params)
-      minetest.chat_send_player(pname, message)
-      return success
+      local success, err = pm_parse_params(pname, params)
+      if not success then
+         minetest.chat_send_player(pname, "Error: "..err)
+         return false
+      end
+      return true
    end
 })
 
