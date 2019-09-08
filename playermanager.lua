@@ -208,6 +208,33 @@ function pm.get_players_for_group(ctgroup_id)
    return players
 end
 
+local QUERY_GET_GROUPS_FOR_PLAYER = [[
+  SELECT ctgroup.id, ctgroup.name, player_ctgroup.permission
+  FROM ctgroup
+  INNER JOIN player_ctgroup
+      ON ctgroup.id = player_ctgroup.ctgroup_id
+     AND player_ctgroup.player_id = ?
+]]
+
+function pm.get_groups_for_player(player_id)
+   local cur = u.prepare(db, QUERY_GET_GROUPS_FOR_PLAYER, player_id)
+   local groups = {}
+   local row = cur:fetch({}, "a")
+   while row do
+      -- TODO: clean up, table shallow copy helper func?
+      table.insert(
+         groups,
+         {
+            name = row.name,
+            id = row.id,
+            permission = row.permission
+         }
+      )
+      row = cur:fetch(row, "a")
+   end
+   return groups
+end
+
 local QUERY_DELETE_PLAYERS_FOR_GROUP = [[
   DELETE FROM player_ctgroup
   WHERE player_ctgroup.ctgroup_id = ?
@@ -280,6 +307,31 @@ local function group_info_cmd(sender, group_name)
       minetest.chat_send_player(
          sender.name,
          "  " .. titlecase_word(perm) .. "s: " .. table.concat(names, ", ")
+      )
+   end
+
+   return true
+end
+
+local function group_list_cmd(sender)
+   local player_groups_info = pm.get_groups_for_player(sender.id)
+
+   minetest.chat_send_player(sender.name, "Your groups:")
+
+   local info_table = {}
+   for _, group_info in pairs(player_groups_info) do
+      local info_tab_entry = info_table[group_info.permission]
+      if info_tab_entry then
+         table.insert(info_table[group_info.permission], group_info.name)
+      else
+         info_table[group_info.permission] = { group_info.name }
+      end
+   end
+
+   for perm, names in pairs(info_table) do
+      minetest.chat_send_player(
+         sender.name,
+         "  " .. titlecase_word(perm) .. " of: " .. table.concat(names, ", ")
       )
    end
 
@@ -422,7 +474,7 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
 
    minetest.chat_send_player(
       sender.name,
-      "Promoted player '"..target_player.name.."' to '" .. new_target_rank ..
+      "Changed rank of player '"..target_player.name.."' to '" .. new_target_rank ..
          "' of group '"..ctgroup.name.."'."
    )
    return true
@@ -501,6 +553,10 @@ local cmd_lookup_table = {
    info = {
       params = { "<group>" },
       fn = group_info_cmd
+   },
+   list = {
+      params = {},
+      fn = group_list_cmd
    },
    rename = {
       params = { "<group>", "<new_name>" },
