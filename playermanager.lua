@@ -586,7 +586,7 @@ local function pm_parse_params(pname, raw_params)
 
    if #params == 0 then
       local actions = u.table_keyvals(cmd_lookup_table)
-      return true, "Usage: /group <action> ...\n" ..
+      return false, "Usage: /group <action> ...\n" ..
          "Valid actions: " .. table.concat(actions, ", ")
    end
 
@@ -596,8 +596,18 @@ local function pm_parse_params(pname, raw_params)
 
    local cmd_spec = cmd_lookup_table[action]
    if cmd_spec then
-      local param_check_limit = cmd_spec.accept_many_after or #cmd_spec.params
-      if #params < param_check_limit then
+      local accept_many_after = cmd_spec.accept_many_after
+      local accept_many = false
+
+      if accept_many_after then
+         accept_many = true
+      else
+         accept_many_after = 0
+      end
+
+      if #params ~= #cmd_spec.params or
+         (accept_many and #params < accept_many_after)
+      then
          return false, "Invalid arguments, usage: /group " .. action .. " "
             .. table.concat(cmd_spec.params, " ")
       end
