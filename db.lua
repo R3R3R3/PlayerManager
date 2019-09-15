@@ -14,7 +14,7 @@ local function prep_db()
    db = assert (env:connect("citadella", "mt"))
 
    -- group table, named ctgroup because heck quoted table names
-   res = assert(u.prepare(db, [[
+   local res = assert(u.prepare(db, [[
      CREATE TABLE IF NOT EXISTS ctgroup (
          id VARCHAR(16) NOT NULL,
          name VARCHAR(16) NOT NULL,
