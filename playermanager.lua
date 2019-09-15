@@ -248,6 +248,14 @@ end
 
 --[[ Command processing (eventually move framework to PMUtils) ]]--
 
+
+function pm.send_chat_group(ctgroup_id, message)
+    for _, playerinfo in ipairs(pm.get_players_for_group(ctgroup_id)) do
+        minetest.chat_send_player(playerinfo.name, message)
+    end
+end
+
+
 local function group_create_cmd(sender, group_name)
    if string.len(group_name) > 16 then
       return false, "Group name '"..group_name..
