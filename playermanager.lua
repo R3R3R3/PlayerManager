@@ -649,14 +649,6 @@ minetest.register_on_joinplayer(function(player)
       local pname = player:get_player_name(player)
       if not pm.get_player_by_name(pname) then
          pm.register_player(pname)
-         minetest.after(
-            3,
-            function(pname)
-               minetest.chat_send_player(pname,
-                  "You wake up in an unfamiliar place..."
-               )
-            end,
-            pname)
       end
 end)
 
