@@ -261,6 +261,11 @@ local function group_create_cmd(sender, group_name)
       return false, "Group name '"..group_name..
          "' is too long (16 character limit)."
    end
+
+   if pm.get_group_by_name(group_name) then
+      return false, "Group '"..group_name.."' already exists."
+   end
+
    pm.register_group(group_name)
    local ctgroup = pm.get_group_by_name(group_name)
    pm.register_player_group_permission(sender.id, ctgroup.id, "admin")
