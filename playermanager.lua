@@ -291,7 +291,7 @@ local function group_info_cmd(sender, group_name)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    local permission = sender_group_info.permission
@@ -359,7 +359,7 @@ local function group_add_cmd(sender, group_name, ...)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    if sender_group_info.permission ~= "admin" then
@@ -383,7 +383,7 @@ local function group_add_cmd(sender, group_name, ...)
          minetest.chat_send_player(
             sender.name,
             "Player '"..target_player.name ..
-               "' is already in group '"..ctgroup.name.."'."
+               "' is already on the group '"..ctgroup.name.."'."
          )
          goto continue
       end
@@ -408,7 +408,7 @@ local function group_remove_cmd(sender, group_name, ...)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    if sender_group_info.permission ~= "admin" then
@@ -432,7 +432,7 @@ local function group_remove_cmd(sender, group_name, ...)
          minetest.chat_send_player(
             sender.name,
             "Player '"..target_player.name ..
-               "' is not in group '"..ctgroup.name.."'."
+               "' is not on the group '"..ctgroup.name.."'."
          )
          goto continue
       end
@@ -457,7 +457,7 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    if sender_group_info.permission ~= "admin" then
@@ -473,7 +473,7 @@ local function group_rank_cmd(sender, group_name, target, new_target_rank)
       = pm.get_player_group(target_player.id, ctgroup.id)
    if not target_player_group_info then
       return false, "Player '"..target_player.name ..
-         "' is not in group '"..ctgroup.name.."'."
+         "' is not on the group '"..ctgroup.name.."'."
    end
    if new_target_rank ~= "member" and
       new_target_rank ~= "mod" and
@@ -501,7 +501,7 @@ local function group_delete_cmd(sender, group_name, confirm)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    if sender_group_info.permission ~= "admin" then
@@ -532,7 +532,7 @@ local function group_rename_cmd(sender, group_name, new_group_name)
 
    local sender_group_info = pm.get_player_group(sender.id, ctgroup.id)
    if not sender_group_info then
-      return false, "You are not on group '"..group_name.."'."
+      return false, "You are not on the group '"..group_name.."'."
    end
 
    if sender_group_info.permission ~= "admin" then
